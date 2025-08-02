@@ -1,15 +1,16 @@
+/* eslint-disable no-process-env */
 import { test, expect } from "@jest/globals";
 import { Document } from "@langchain/core/documents";
 import oracledb from "oracledb";
 import { env } from "node:process";
-import { OracleEmbeddings } from "../../embeddings/oracle.js";
+import { OracleEmbeddings } from "../index.js";
 import {
   createIndex,
   DistanceStrategy,
   type OracleDBVSStoreArgs,
   OracleVS,
   dropTablePurge,
-} from "../oraclevs.js";
+} from "../index.js";
 
 describe("OracleVectorStore", () => {
   const tableName = "testlangchain_1";
