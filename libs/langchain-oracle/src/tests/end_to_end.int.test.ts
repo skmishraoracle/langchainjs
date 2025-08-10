@@ -1,5 +1,5 @@
 /* eslint-disable no-process-env */
-import { test } from "@jest/globals";
+import { test, expect } from "@jest/globals";
 import * as url from "node:url";
 import * as path from "node:path";
 import { Document } from "@langchain/core/documents";
@@ -97,6 +97,8 @@ describe("Integrated Testing ", () => {
       }
     }
 
+    await dropTablePurge(connection as oracledb.Connection, tableName);
+
     const oraclevs = await OracleVS.fromDocuments(
       total_chunks,
       embedder,
@@ -114,15 +116,20 @@ describe("Integrated Testing ", () => {
       "What is an attention mask?",
       5
     );
-    console.log(matches);
+    expect(matches).toHaveLength(5);
+    expect(matches[0].metadata.summary).toContain("Transformer");
 
     matches = await oraclevs.similaritySearch("What is inattention?", 5);
-    console.log(matches);
+    expect(matches).toHaveLength(5);
+    expect(matches[0].metadata.summary).toContain(
+      "What is considered as Normal Attention Span?"
+    );
 
     matches = await oraclevs.similaritySearch(
       "software developer with experience in LLM's",
       5
     );
-    console.log(matches);
+    expect(matches).toHaveLength(5);
+    expect(matches[0].metadata.summary).toContain("Jacob Lee Resume");
   });
 });
