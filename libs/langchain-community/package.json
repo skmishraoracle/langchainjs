@@ -337,6 +337,7 @@
     "notion-to-md": "^3.1.0",
     "officeparser": "^4.0.4",
     "openai": "*",
+    "oracledb": "^6.8.0",
     "pdf-parse": "1.1.1",
     "pg": "^8.11.0",
     "pg-copy-streams": "^6.0.5",

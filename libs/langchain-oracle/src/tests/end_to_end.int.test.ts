@@ -10,17 +10,14 @@ import {
   OracleEmbeddings,
   OracleSummary,
   DistanceStrategy,
+  dropTablePurge,
   createIndex,
   OracleVS,
 } from "../index.js";
 
-test("Test end-to-end", async () => {
-  const pool = await oracledb.createPool({
-    user: process.env.ORACLE_USERNAME,
-    password: process.env.ORACLE_PASSWORD,
-    connectString: process.env.ORACLE_DSN,
-  });
-
+describe("Integrated Testing ", () => {
+  let connection: oracledb.Connection | undefined;
+  let pool: oracledb.Pool | undefined;
   const filePath = path.resolve(
     path.dirname(url.fileURLToPath(import.meta.url)),
     "./example_data/"
@@ -33,9 +30,23 @@ test("Test end-to-end", async () => {
     model: process.env.DEMO_ONNX_MODEL,
   };
   const summaryPref = { provider: "database", gLevel: "P" };
+  const tableName = "embeddings";
 
-  let connection;
-  try {
+  afterAll(async () => {
+    if (connection) {
+      await dropTablePurge(connection as oracledb.Connection, tableName);
+      await connection?.close();
+      await pool?.close();
+    }
+  });
+
+  test("Test end-to-end", async () => {
+    pool = await oracledb.createPool({
+      user: process.env.ORACLE_USERNAME,
+      password: process.env.ORACLE_PASSWORD,
+      connectString: process.env.ORACLE_DSN,
+    });
+
     connection = await pool.getConnection();
 
     // instantiate loader, splitter, and embedder
@@ -46,7 +57,7 @@ test("Test end-to-end", async () => {
 
     const dbConfig = {
       client: pool,
-      tableName: "embeddings",
+      tableName,
       distanceStrategy: DistanceStrategy.DOT_PRODUCT,
       query: "What are salient features of oracledb",
       embeddings: embedder,
@@ -99,15 +110,19 @@ test("Test end-to-end", async () => {
       accuracy: 90,
     });
 
-    let matches = await oraclevs.similaritySearch("What is an attention mask?", 5);
+    let matches = await oraclevs.similaritySearch(
+      "What is an attention mask?",
+      5
+    );
     console.log(matches);
 
     matches = await oraclevs.similaritySearch("What is inattention?", 5);
     console.log(matches);
 
-    matches = await oraclevs.similaritySearch("software developer with experience in LLM's", 5);
+    matches = await oraclevs.similaritySearch(
+      "software developer with experience in LLM's",
+      5
+    );
     console.log(matches);
-  } finally {
-    if (connection) await connection.release();
-  }
+  });
 });
