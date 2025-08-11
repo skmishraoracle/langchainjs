@@ -123,7 +123,7 @@ export function generateWhereClause(dbFilter: Metadata): string {
   throw new Error(`Invalid filter structure: ${JSON.stringify(dbFilter)}`);
 }
 
-export interface OracleDBVSStoreArgs {
+export interface OracleDBVSArgs {
   tableName: string;
   schemaName?: string | null;
   client: oracledb.Pool | oracledb.Connection;
@@ -418,7 +418,7 @@ export class OracleVS extends VectorStore {
     return "oraclevs";
   }
 
-  constructor(embeddings: EmbeddingsInterface, dbConfig: OracleDBVSStoreArgs) {
+  constructor(embeddings: EmbeddingsInterface, dbConfig: OracleDBVSArgs) {
     super(embeddings, dbConfig);
 
     try {
@@ -726,7 +726,7 @@ export class OracleVS extends VectorStore {
     const queryEmbedding: number[] = Array.from(embedding);
 
     // Ensure lambdaMult has a default value if not provided
-    const lambdaMult = 0.5;
+    const lambdaMult = options.lambda ?? 0.5;
     const mmrSelectedIndices: number[] = maximalMarginalRelevance(
       queryEmbedding,
       consistentEmbeddings,
@@ -742,7 +742,7 @@ export class OracleVS extends VectorStore {
   }
 
   public async delete(params: {
-    ids?: string[];
+    ids?: Buffer[];
     deleteAll?: boolean;
   }): Promise<void> {
     let connection: oracledb.Connection | null = null;
@@ -775,7 +775,7 @@ export class OracleVS extends VectorStore {
   static async fromDocuments(
     documents: Document[],
     embeddings: EmbeddingsInterface,
-    dbConfig: OracleDBVSStoreArgs
+    dbConfig: OracleDBVSArgs
   ): Promise<OracleVS> {
     const { client } = dbConfig;
     if (!client) throw new Error("client parameter is required...");

@@ -9,7 +9,7 @@ import {
   createIndex,
   dropTablePurge,
   DistanceStrategy,
-  type OracleDBVSStoreArgs,
+  type OracleDBVSArgs,
 } from "../index.js";
 import { OracleVS, type Metadata } from "../vectorstores.js";
 
@@ -19,6 +19,7 @@ describe("OracleVectorStore", () => {
   let embedder: OracleEmbeddings;
   let connection: oracledb.Connection | undefined;
   let oraclevs: OracleVS | undefined;
+  let dbConfig: OracleDBVSArgs;
 
   beforeAll(async () => {
     pool = await oracledb.createPool({
@@ -33,6 +34,12 @@ describe("OracleVectorStore", () => {
     };
     connection = await pool.getConnection();
     embedder = new OracleEmbeddings(connection, pref);
+    dbConfig = {
+      client: pool,
+      tableName,
+      distanceStrategy: DistanceStrategy.DOT_PRODUCT,
+      query: "What are salient features of oracledb",
+    };
   });
 
   beforeEach(async () => {
@@ -51,13 +58,6 @@ describe("OracleVectorStore", () => {
 
     try {
       connection = await pool.getConnection();
-      const dbConfig: OracleDBVSStoreArgs = {
-        client: pool,
-        tableName,
-        distanceStrategy: DistanceStrategy.DOT_PRODUCT,
-        query: "What are salient features of oracledb",
-      };
-
       const docs = [];
       docs.push(new Document({ pageContent: "I like soccer." }));
       docs.push(new Document({ pageContent: "I love Stephen King." }));
@@ -88,13 +88,6 @@ describe("OracleVectorStore", () => {
   });
 
   test("Test vectorstore addDocuments", async () => {
-    const dbConfig: OracleDBVSStoreArgs = {
-      client: pool,
-      tableName,
-      distanceStrategy: DistanceStrategy.DOT_PRODUCT,
-      query: "What are salient features of oracledb",
-    };
-
     oraclevs = new OracleVS(embedder, dbConfig);
     await oraclevs.initialize();
 
@@ -121,13 +114,6 @@ describe("OracleVectorStore", () => {
   });
 
   test("Test vectorstore addDocuments and find using filter IN Clause", async () => {
-    const dbConfig: OracleDBVSStoreArgs = {
-      client: pool,
-      tableName,
-      distanceStrategy: DistanceStrategy.DOT_PRODUCT,
-      query: "What are salient features of oracledb",
-    };
-
     oraclevs = new OracleVS(embedder, dbConfig);
     await oraclevs.initialize();
 
@@ -177,7 +163,12 @@ describe("OracleVectorStore", () => {
     expect(results).toHaveLength(1);
     expect(results).toEqual([
       expect.objectContaining({
-        metadata: { category: "research/AI", author: ["Andrew Ng"], tags: ["AI", "ML"], status: "release" },
+        metadata: {
+          category: "research/AI",
+          author: ["Andrew Ng"],
+          tags: ["AI", "ML"],
+          status: "release",
+        },
         pageContent:
           "Andrew Ng shares insights on scaling AI education to democratize access to machine learning tools.",
       }),
@@ -185,12 +176,6 @@ describe("OracleVectorStore", () => {
   });
 
   test("should handle a simple _and clause", async () => {
-    const dbConfig: OracleDBVSStoreArgs = {
-      client: pool,
-      tableName,
-      distanceStrategy: DistanceStrategy.DOT_PRODUCT,
-      query: "What are salient features of oracledb",
-    };
     oraclevs = new OracleVS(embedder, dbConfig);
     await oraclevs.initialize();
 
@@ -231,12 +216,6 @@ describe("OracleVectorStore", () => {
   });
 
   test("should handle a simple _or clause", async () => {
-    const dbConfig: OracleDBVSStoreArgs = {
-      client: pool,
-      tableName,
-      distanceStrategy: DistanceStrategy.DOT_PRODUCT,
-      query: "What are salient features of oracledb",
-    };
     oraclevs = new OracleVS(embedder, dbConfig);
     await oraclevs.initialize();
 
@@ -283,12 +262,6 @@ describe("OracleVectorStore", () => {
   });
 
   test("should handle a nested _and and _or clause", async () => {
-    const dbConfig: OracleDBVSStoreArgs = {
-      client: pool,
-      tableName,
-      distanceStrategy: DistanceStrategy.DOT_PRODUCT,
-      query: "What are salient features of oracledb",
-    };
     oraclevs = new OracleVS(embedder, dbConfig);
     await oraclevs.initialize();
 
@@ -385,5 +358,97 @@ describe("OracleVectorStore", () => {
         }),
       ])
     );
+  });
+
+  test("Test MMR search", async () => {
+    oraclevs = new OracleVS(embedder, dbConfig);
+    await oraclevs.initialize();
+
+    const documents = [
+      {
+        pageContent: "Top 10 beaches in Spain with golden sands",
+        metadata: { country: "Spain" },
+      },
+      {
+        pageContent: "Hidden gems: remote Greek islands you must visit",
+        metadata: { country: "Greece" },
+      },
+      {
+        pageContent: "Spain's Costa Brava: a detailed travel guide",
+        metadata: { country: "Spain" },
+      },
+      {
+        pageContent: "Best beaches in Croatia with crystal-clear waters",
+        metadata: { country: "Croatia" },
+      },
+      {
+        pageContent: "Budget travel tips for backpacking across Europe",
+        metadata: { country: "General" },
+      },
+    ];
+
+    await oraclevs.addDocuments(documents);
+    const results = await oraclevs.maxMarginalRelevanceSearch(
+      "best beaches in Europe",
+      {
+        k: 3,
+      }
+    );
+
+    // Extract only page contents for checking
+    const pageContents = results.map((r) => r.pageContent);
+
+    // Should have 3 results
+    expect(pageContents).toHaveLength(3);
+
+    // Results should be relevant but not all from the same country
+    const countries = new Set(results.map((r) => r.metadata.country));
+    expect(countries.size).toBeGreaterThan(1); // ensures diversity
+
+    // The top result should be highly relevant to "best beaches"
+    expect(pageContents[0].toLowerCase()).toMatch(/beach|island/);
+  });
+
+  test("Delete document by id", async () => {
+    let connection: oracledb.Connection | undefined;
+
+    const documents = [
+      { pageContent: "Hello", metadata: { a: 1 } },
+      { pageContent: "Bye", metadata: { a: 2 } },
+      { pageContent: "FIFO", metadata: { a: 3 } },
+    ];
+
+    try {
+      connection = await pool.getConnection();
+      const oraclevs = new OracleVS(embedder, dbConfig);
+      await oraclevs.initialize();
+      await oraclevs.addDocuments(documents);
+
+      const getIds = async (): Promise<Buffer[]> => {
+        const res = await connection!.execute(`SELECT id FROM "${tableName}"`);
+        return (res.rows ?? []).map((row: unknown) => {
+          if (
+            !Array.isArray(row) ||
+            row.length === 0 ||
+            !Buffer.isBuffer(row[0])
+          ) {
+            throw new Error(`Unexpected row format: ${JSON.stringify(row)}`);
+          }
+          return row[0];
+        });
+      };
+
+
+      const [id1, id2, idKeep] = await getIds();
+      await oraclevs.delete({ ids: [id1, id2] });
+
+      const idsAfterDelete = await getIds();
+      expect(idsAfterDelete).toHaveLength(1);
+      expect(idsAfterDelete).toContainEqual(idKeep);
+      expect(idsAfterDelete).not.toContainEqual(id1);
+      expect(idsAfterDelete).not.toContainEqual(id2);
+    } finally {
+      await connection?.close();
+    }
   });
 });
