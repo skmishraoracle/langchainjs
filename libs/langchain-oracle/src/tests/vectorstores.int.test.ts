@@ -438,7 +438,6 @@ describe("OracleVectorStore", () => {
         });
       };
 
-
       const [id1, id2, idKeep] = await getIds();
       await oraclevs.delete({ ids: [id1, id2] });
 
