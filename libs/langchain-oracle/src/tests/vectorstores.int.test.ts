@@ -218,9 +218,7 @@ describe("OracleVectorStore", () => {
 
     // FilterCondition to have a simple filter
     filter = {
-      _and: [
-        { category : "books" }
-      ],
+      _and: [{ category: "books" }],
     };
     results = await oraclevs.similaritySearch("test", 2, filter);
     expect(results).toBeInstanceOf(Array);

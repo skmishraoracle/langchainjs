@@ -13,7 +13,7 @@ export type Metadata = FilterCondition | FilterGroup | Record<string, unknown>;
 export interface FilterCondition {
   key: string; // JSON field inside metadata
   oper: string; // Logical operator name: EQ, GT, LT, GTE, LTE
-  value: any; // Value to compare against
+  value: unknown; // Value to compare against
 }
 
 export interface FilterGroup {
@@ -41,35 +41,69 @@ function convertOperToSql(oper: string): string {
 /**
  * Generate JSON_EXISTS condition from a FilterCondition
  */
-function generateCondition(condition: FilterCondition): string {
+function generateCondition(
+  condition: FilterCondition,
+  bindValues: unknown[]
+): string {
   const { key } = condition;
   const oper = convertOperToSql(condition.oper);
-  let { value } = condition;
+  const { value } = condition;
 
-  if (typeof value === "string") {
-    value = `"${value}"`;
-  }
-
-  return `JSON_EXISTS(metadata, '$.${key}?(@ ${oper} ${value})')`;
+  bindValues.push(value);
+  const pos = bindValues.length;
+  return `JSON_EXISTS(metadata, '$.${key}?(@ ${oper} $bindName)' PASSING :${pos} AS "bindName")`;
 }
 
 /**
  * Generate OR chain of JSON_EXISTS for array values (IN-style)
  */
-function generateInCondition(column: string, values: string[]): string {
-  const clauses = values.map(
-    (v) => `JSON_EXISTS(metadata, '$.${column}?(@ == "${v}")')`
-  );
-  return `${clauses.join(" OR ")}`;
+function generateInCondition(
+  column: string,
+  values: string[],
+  bindValues: unknown[]
+): string {
+  const clauses = values.map((v) => {
+    bindValues.push(v);
+    const pos = bindValues.length; // 1-based bind position
+    return `JSON_EXISTS(metadata, '$.${column}?(@ == $bindName)' PASSING :${pos} AS "bindName")`;
+  });
+
+  return clauses.join(" OR ");
+}
+
+function buildJsonPath(column: string): string {
+  // Quote each path segment so keys with dots/spaces/hyphens are safe
+  // e.g. category.sub -> $."category"."sub"
+  const segs = column.split(".").map((s) => `"${s.replace(/"/g, '""')}"`);
+  return `$.${segs.join(".")}`;
+}
+
+/**
+ * Generate OR chain of JSON_EQUAL for { k: val}
+ */
+export function generateEqualCondition(
+  column: string,
+  value: string,
+  bindValues: unknown[]
+): string {
+  bindValues.push(value);
+  const pos = bindValues.length;
+
+  const path = buildJsonPath(column);
+  // For string scalars:
+  return `JSON_VALUE(metadata, '${path}') = :${pos}`;
 }
 
 /**
  * Recursively generate WHERE clause
  */
-export function generateWhereClause(dbFilter: Metadata): string {
+export function generateWhereClause(
+  dbFilter: Metadata,
+  bindValues: unknown[]
+): string {
   // Case 1: Single FilterCondition
   if ("key" in dbFilter) {
-    return generateCondition(dbFilter as FilterCondition);
+    return generateCondition(dbFilter as FilterCondition, bindValues);
   }
 
   // Case 2: Shorthand IN-style filter { column: ["v1", "v2"] }
@@ -81,19 +115,19 @@ export function generateWhereClause(dbFilter: Metadata): string {
 
       // Case 1: Array directly → { author: ["a", "b"] }
       if (Array.isArray(val)) {
-        return generateInCondition(col, val as string[]);
+        return generateInCondition(col, val as string[], bindValues);
       }
 
       // value is a string -> { author: "a"}
       if (typeof val === "string") {
-        return `JSON_EQUAL(JSON_QUERY(metadata, '$.${col}'), '"${val}"')`;
+        return generateEqualCondition(col, val, bindValues);
       }
 
       // Case 2: Object with IN → { author: { IN: ["a", "b"] } }
       if (typeof val === "object" && val !== null && "IN" in val) {
         const inVals = (val as { IN: string[] }).IN;
         if (Array.isArray(inVals)) {
-          return generateInCondition(col, inVals);
+          return generateInCondition(col, inVals, bindValues);
         }
       }
     }
@@ -106,7 +140,7 @@ export function generateWhereClause(dbFilter: Metadata): string {
     dbFilter._and.length > 0
   ) {
     const andConditions = dbFilter._and.map((cond) =>
-      generateWhereClause(cond as any)
+      generateWhereClause(cond as any, bindValues)
     );
     return `(${andConditions.join(" AND ")})`;
   }
@@ -118,7 +152,7 @@ export function generateWhereClause(dbFilter: Metadata): string {
     dbFilter._or.length > 0
   ) {
     const orConditions = dbFilter._or.map((cond) =>
-      generateWhereClause(cond as any)
+      generateWhereClause(cond as any, bindValues)
     );
     return `(${orConditions.join(" OR ")})`;
   }
@@ -600,14 +634,14 @@ export class OracleVS extends VectorStore {
       SELECT id, 
         text,
         metadata,
-        vector_distance(embedding, :embedding, ${this.distanceStrategy}) as distance,
+        vector_distance(embedding, :1, ${this.distanceStrategy}) as distance,
         embedding
       FROM ${this.tableName} `;
       if (filter && Object.keys(filter).length > 0) {
-        sqlQuery += ` WHERE ${generateWhereClause(filter)}`;
+        sqlQuery += ` WHERE ${generateWhereClause(filter, bindValues)}`;
       }
-      sqlQuery += " ORDER BY distance FETCH APPROX FIRST :k ROWS ONLY ";
       bindValues.push(k);
+      sqlQuery += ` ORDER BY distance FETCH APPROX FIRST :${bindValues.length} ROWS ONLY `;
 
       // Execute the query
       connection = await this.getConnection();
