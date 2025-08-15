@@ -1,5 +1,3 @@
-/* eslint-disable import/no-extraneous-dependencies */
-/* eslint-disable @typescript-eslint/no-explicit-any */
 import oracledb from "oracledb";
 import { createHash } from "crypto";
 import {
@@ -84,6 +82,11 @@ export function generateWhereClause(dbFilter: Metadata): string {
       // Case 1: Array directly → { author: ["a", "b"] }
       if (Array.isArray(val)) {
         return generateInCondition(col, val as string[]);
+      }
+
+      // value is a string -> { author: "a"}
+      if (typeof val === "string") {
+        return `JSON_EQUAL(JSON_QUERY(metadata, '$.${col}'), '"${val}"')`;
       }
 
       // Case 2: Object with IN → { author: { IN: ["a", "b"] } }

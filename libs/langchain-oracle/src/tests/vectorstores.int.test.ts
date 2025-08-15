@@ -198,20 +198,36 @@ describe("OracleVectorStore", () => {
         metadata: { category: "books", price: 10 },
       }),
     ];
+
     await oraclevs.addDocuments(docs);
-    const filter: Metadata = {
+
+    // FilterCondition to have keywords , key, oper, value..
+    let filter: Metadata = {
       _and: [
         { key: "category", oper: "EQ", value: "books" },
         { key: "price", oper: "LTE", value: 20 },
       ],
     };
-    const results = await oraclevs.similaritySearch("test", 2, filter);
+    let results = await oraclevs.similaritySearch("test", 2, filter);
+    expect(results).toBeInstanceOf(Array);
+    expect(results).toHaveLength(2);
+    results.forEach((doc) => {
+      expect(doc.metadata.category).toBe("books");
+      expect(doc.metadata.price).toBeLessThanOrEqual(20);
+    });
+
+    // FilterCondition to have a simple filter
+    filter = {
+      _and: [
+        { category : "books" }
+      ],
+    };
+    results = await oraclevs.similaritySearch("test", 2, filter);
     expect(results).toBeInstanceOf(Array);
     expect(results).toHaveLength(2);
 
     results.forEach((doc) => {
       expect(doc.metadata.category).toBe("books");
-      expect(doc.metadata.price).toBeLessThanOrEqual(20);
     });
   });
 
