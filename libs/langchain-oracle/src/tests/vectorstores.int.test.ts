@@ -220,9 +220,9 @@ describe("OracleVectorStore", () => {
     filter = {
       _and: [{ category: "books" }],
     };
-    results = await oraclevs.similaritySearch("test", 2, filter);
+    results = await oraclevs.similaritySearch("test", 4, filter);
     expect(results).toBeInstanceOf(Array);
-    expect(results).toHaveLength(2);
+    expect(results).toHaveLength(3); // gives all rows with category books
 
     results.forEach((doc) => {
       expect(doc.metadata.category).toBe("books");
