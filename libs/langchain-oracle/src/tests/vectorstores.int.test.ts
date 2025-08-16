@@ -208,7 +208,7 @@ describe("OracleVectorStore", () => {
         { key: "price", oper: "LTE", value: 20 },
       ],
     };
-    let results = await oraclevs.similaritySearch("test", 2, filter);
+    let results = await oraclevs.similaritySearch("test", 5, filter);
     expect(results).toBeInstanceOf(Array);
     expect(results).toHaveLength(2);
     results.forEach((doc) => {
