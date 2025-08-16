@@ -227,6 +227,16 @@ describe("OracleVectorStore", () => {
     results.forEach((doc) => {
       expect(doc.metadata.category).toBe("books");
     });
+
+    // filter with simple key/value comparision
+    filter = { category: "books" };
+    results = await oraclevs.similaritySearch("test", 4, filter);
+    expect(results).toBeInstanceOf(Array);
+    expect(results).toHaveLength(3); // gives all rows with category books
+    results.forEach((doc) => {
+      expect(doc.metadata.category).toBe("books");
+    });
+
   });
 
   test("should handle a simple _or clause", async () => {
