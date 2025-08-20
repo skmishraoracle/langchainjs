@@ -194,7 +194,7 @@ describe("OracleVectorStore", () => {
         metadata: { category: "games", price: 40 },
       }),
       new Document({
-        pageContent: "A romantic novel set in Paris.",
+        pageContent: "A suspense narrative in Paris.",
         metadata: { category: "books", price: 10 },
       }),
     ];
@@ -277,7 +277,7 @@ describe("OracleVectorStore", () => {
         metadata: { category: "games", price: 15 },
       }),
       new Document({
-        pageContent: "A romantic novel set in Paris.",
+        pageContent: "A suspense narrative in Paris.",
         metadata: { category: "books", price: 10 },
       }),
       new Document({
