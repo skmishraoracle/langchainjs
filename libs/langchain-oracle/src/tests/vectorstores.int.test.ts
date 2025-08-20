@@ -175,7 +175,7 @@ describe("OracleVectorStore", () => {
     ]);
   });
 
-  test("should handle a simple _and clause", async () => {
+  test("should handle a simple with and without _and clause", async () => {
     oraclevs = new OracleVS(embedder, dbConfig);
     await oraclevs.initialize();
 
@@ -228,7 +228,7 @@ describe("OracleVectorStore", () => {
       expect(doc.metadata.category).toBe("books");
     });
 
-    // filter with simple key/value comparision
+    // filter with out _and keyword
     filter = { category: "books" };
     results = await oraclevs.similaritySearch("test", 4, filter);
     expect(results).toBeInstanceOf(Array);
@@ -237,6 +237,25 @@ describe("OracleVectorStore", () => {
       expect(doc.metadata.category).toBe("books");
     });
 
+    // filter with simple key/value and comparision with out _and keyword
+    filter = { category: "books", price: 10 };
+    results = await oraclevs.similaritySearch("test", 4, filter);
+    expect(results).toBeInstanceOf(Array);
+    expect(results).toHaveLength(1); // gives all rows with category books
+    results.forEach((doc) => {
+      expect(doc.metadata.category).toBe("books");
+      expect(doc.metadata.price).toBe(10);
+    });
+
+     // filter with simple key/value
+    filter = { price: 10 };
+    results = await oraclevs.similaritySearch("test", 4, filter);
+    expect(results).toBeInstanceOf(Array);
+    expect(results).toHaveLength(1); // gives all rows with category books
+    results.forEach((doc) => {
+      expect(doc.metadata.category).toBe("books");
+      expect(doc.metadata.price).toBe(10);
+    });
   });
 
   test("should handle a simple _or clause", async () => {

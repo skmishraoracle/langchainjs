@@ -106,30 +106,34 @@ export function generateWhereClause(
     return generateCondition(dbFilter as FilterCondition, bindValues);
   }
 
-  // Case 2: Shorthand IN-style filter { column: ["v1", "v2"] }
-
+  // Case 2:
+  //  IN-style filter { column: ["v1", "v2"] }
+  //  JS filters like { key1: "val1", key2: val2}
   if (!("_and" in dbFilter) && !("_or" in dbFilter)) {
     const entries = Object.entries(dbFilter);
-    if (entries.length === 1) {
-      const [col, val] = entries[0];
+    if (entries.length > 0) {
+      const conditions = entries.map(([col, val]) => {
+        if (Array.isArray(val)) { // without IN keyword
+          // { author: ["a", "b"] }
+          return generateInCondition(col, val as string[], bindValues);
+        }
 
-      // Case 1: Array directly → { author: ["a", "b"] }
-      if (Array.isArray(val)) {
-        return generateInCondition(col, val as string[], bindValues);
-      }
-
-      // value is a string -> { author: "a"}
-      if (typeof val === "string") {
-        return generateEqualCondition(col, val, bindValues);
-      }
-
-      // Case 2: Object with IN → { author: { IN: ["a", "b"] } }
-      if (typeof val === "object" && val !== null && "IN" in val) {
-        const inVals = (val as { IN: string[] }).IN;
-        if (Array.isArray(inVals)) {
+        if (typeof val === "object" && val !== null && "IN" in val) { // with IN keyword
+          // { author: { IN: ["a", "b"] } }
+          const inVals = (val as { IN: string[] }).IN;
           return generateInCondition(col, inVals, bindValues);
         }
-      }
+
+        if (typeof val === "string" || typeof val === "number") {
+          return generateEqualCondition(col, val.toString(), bindValues);
+        }
+
+        throw new Error(`Unsupported value type for column ${col}`);
+      });
+
+      return conditions.length > 1
+        ? `(${conditions.join(" AND ")})`
+        : conditions[0];
     }
   }
 
