@@ -222,7 +222,7 @@ describe("OracleVectorStore", () => {
     };
     results = await oraclevs.similaritySearch("test", 4, filter);
     expect(results).toBeInstanceOf(Array);
-    expect(results).toHaveLength(3); // gives all rows with category books and price 10
+    expect(results).toHaveLength(3); // gives all rows with category books
 
     results.forEach((doc) => {
       expect(doc.metadata.category).toBe("books");
@@ -241,7 +241,7 @@ describe("OracleVectorStore", () => {
     filter = { category: "books", price: 10 };
     results = await oraclevs.similaritySearch("test", 4, filter);
     expect(results).toBeInstanceOf(Array);
-    expect(results).toHaveLength(1); // gives all rows with category books
+    expect(results).toHaveLength(1); // gives all rows with category books and price 10
     results.forEach((doc) => {
       expect(doc.metadata.category).toBe("books");
       expect(doc.metadata.price).toBe(10);
@@ -251,7 +251,7 @@ describe("OracleVectorStore", () => {
     filter = { price: 10 };
     results = await oraclevs.similaritySearch("test", 4, filter);
     expect(results).toBeInstanceOf(Array);
-    expect(results).toHaveLength(1); // gives all rows with category books
+    expect(results).toHaveLength(1); // gives all rows with price 10
     results.forEach((doc) => {
       expect(doc.metadata.category).toBe("books");
       expect(doc.metadata.price).toBe(10);
