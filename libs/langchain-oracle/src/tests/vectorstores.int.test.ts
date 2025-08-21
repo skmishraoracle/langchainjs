@@ -104,7 +104,7 @@ describe("OracleVectorStore", () => {
       expect.objectContaining({ metadata: { a: 2 }, pageContent: "hello" }),
     ]);
 
-    const dbFilter = { key: "a", oper: "EQ", value: 1 }; // { a:1 }
+    const dbFilter = { a: 1 };
     const results2 = await oraclevs.similaritySearchWithScore(
       "hello!",
       1,
@@ -153,7 +153,7 @@ describe("OracleVectorStore", () => {
 
     await oraclevs.addDocuments(docs);
 
-    const filter = { author: { IN: ["Andrew Ng", "Demis Hassabis"] } };
+    const filter = { author: { $in: ["Andrew Ng", "Demis Hassabis"] } };
     const results = await oraclevs.similaritySearch(
       "latest advances in AI research for education",
       1,
@@ -203,10 +203,7 @@ describe("OracleVectorStore", () => {
 
     // FilterCondition to have keywords , key, oper, value..
     let filter: Metadata = {
-      _and: [
-        { key: "category", oper: "EQ", value: "books" },
-        { key: "price", oper: "LTE", value: 20 },
-      ],
+      $and: [{ category: "books" }, { price: { $lte: 20 } }],
     };
     let results = await oraclevs.similaritySearch("test", 5, filter);
     expect(results).toBeInstanceOf(Array);
@@ -218,7 +215,7 @@ describe("OracleVectorStore", () => {
 
     // FilterCondition to have a simple filter
     filter = {
-      _and: [{ category: "books" }],
+      $and: [{ category: "books" }],
     };
     results = await oraclevs.similaritySearch("test", 4, filter);
     expect(results).toBeInstanceOf(Array);
@@ -247,7 +244,7 @@ describe("OracleVectorStore", () => {
       expect(doc.metadata.price).toBe(10);
     });
 
-     // filter with simple key/value
+    // filter with simple key/value
     filter = { price: 10 };
     results = await oraclevs.similaritySearch("test", 4, filter);
     expect(results).toBeInstanceOf(Array);
@@ -288,10 +285,7 @@ describe("OracleVectorStore", () => {
     ];
     await oraclevs.addDocuments(docs);
     const filter: Metadata = {
-      _or: [
-        { key: "category", oper: "EQ", value: "books" },
-        { key: "price", oper: "LTE", value: 20 },
-      ],
+      $or: [{ category: "books" }, { price: { $lte: 20 } }],
     };
     const results = await oraclevs.similaritySearch("test", 6, filter);
     expect(results).toBeInstanceOf(Array);
@@ -344,23 +338,17 @@ describe("OracleVectorStore", () => {
     await oraclevs.addDocuments(docs, { ids: ["1", "2", "3", "4", "5"] });
 
     const filter: Metadata = {
-      _or: [
+      $or: [
         // First OR branch: simple AND group
         {
-          _and: [
-            { key: "category", oper: "EQ", value: "books" },
-            { key: "price", oper: "LTE", value: 20 },
-          ],
+          $and: [{ category: "books" }, { price: { $lte: 20 } }],
         },
         // Second OR branch: nested OR inside AND
         {
-          _and: [
-            { key: "category", oper: "EQ", value: "electronics" },
+          $and: [
+            { category: "electronics" },
             {
-              _or: [
-                { key: "price", oper: "LTE", value: 20 },
-                { key: "rating", oper: "GTE", value: 4.5 },
-              ],
+              $or: [{ price: { $lte: 20 } }, { rating: { $gte: 4.5 } }],
             },
           ],
         },
