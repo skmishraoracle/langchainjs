@@ -153,6 +153,7 @@ describe("OracleVectorStore", () => {
 
     await oraclevs.addDocuments(docs);
 
+    // $in clause
     let filter: Metadata = { author: { $in: ["Andrew Ng", "Demis Hassabis"] } };
     let results = await oraclevs.similaritySearch(
       "latest advances in AI research for education",
@@ -174,6 +175,29 @@ describe("OracleVectorStore", () => {
       }),
     ]);
 
+    // without $in clause
+    filter = { author: ["Andrew Ng", "Demis Hassabis"] };
+    results = await oraclevs.similaritySearch(
+      "latest advances in AI research for education",
+      1,
+      filter
+    );
+
+    expect(results).toHaveLength(1);
+    expect(results).toEqual([
+      expect.objectContaining({
+        metadata: {
+          category: "research/AI",
+          author: ["Andrew Ng"],
+          tags: ["AI", "ML"],
+          status: "release",
+        },
+        pageContent:
+          "Andrew Ng shares insights on scaling AI education to democratize access to machine learning tools.",
+      }),
+    ]);
+
+    // with $nin clause
     filter = { author: { $nin: ["Andrew Ng", "Demis Hassabis"] } };
     results = await oraclevs.similaritySearch(
       "latest advances in AI research for education",
