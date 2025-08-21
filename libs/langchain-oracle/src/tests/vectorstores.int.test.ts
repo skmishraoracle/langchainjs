@@ -113,7 +113,7 @@ describe("OracleVectorStore", () => {
     expect(results2).toHaveLength(1);
   });
 
-  test("Test vectorstore addDocuments and find using filter IN Clause", async () => {
+  test("Test vectorstore addDocuments and find using filter IN and NIN Clause", async () => {
     oraclevs = new OracleVS(embedder, dbConfig);
     await oraclevs.initialize();
 
@@ -153,8 +153,8 @@ describe("OracleVectorStore", () => {
 
     await oraclevs.addDocuments(docs);
 
-    const filter = { author: { $in: ["Andrew Ng", "Demis Hassabis"] } };
-    const results = await oraclevs.similaritySearch(
+    let filter: Metadata = { author: { $in: ["Andrew Ng", "Demis Hassabis"] } };
+    let results = await oraclevs.similaritySearch(
       "latest advances in AI research for education",
       1,
       filter
@@ -173,9 +173,53 @@ describe("OracleVectorStore", () => {
           "Andrew Ng shares insights on scaling AI education to democratize access to machine learning tools.",
       }),
     ]);
+
+    filter = { author: { $nin: ["Andrew Ng", "Demis Hassabis"] } };
+    results = await oraclevs.similaritySearch(
+      "latest advances in AI research for education",
+      5,
+      filter
+    );
+
+    expect(results).toHaveLength(3);
+    expect(results).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          metadata: {
+            category: "research/AI",
+            author: ["Geoffrey Hinton"],
+            tags: ["AI", "ML"],
+            status: "release",
+          },
+          pageContent:
+            "Geoffrey Hinton explores the future of deep learning and its impact on AI research.",
+        }),
+        expect.objectContaining({
+          metadata: {
+            category: "research/AI",
+            author: ["Yoshua Bengio"],
+            tags: ["AI", "ML"],
+            status: "release",
+          },
+          pageContent:
+            "Yoshua Bengio presents breakthroughs in neural network architectures for natural language understanding.",
+        }),
+
+        expect.objectContaining({
+          metadata: {
+            category: "sports",
+            author: ["Alice", "Bob"],
+            tags: ["AI", "ML"],
+            status: "release",
+          },
+          pageContent:
+            "Alice discusses the application of machine learning and AI research in predicting football match outcomes.",
+        }),
+      ])
+    );
   });
 
-  test("should handle a simple with and without _and clause", async () => {
+  test("should handle simple conditions with and without _and clause", async () => {
     oraclevs = new OracleVS(embedder, dbConfig);
     await oraclevs.initialize();
 
@@ -253,6 +297,35 @@ describe("OracleVectorStore", () => {
       expect(doc.metadata.category).toBe("books");
       expect(doc.metadata.price).toBe(10);
     });
+
+    // filter with $between
+    filter = { price: { $between: [10, 25] } };
+    results = await oraclevs.similaritySearch("test", 4, filter);
+    expect(results).toBeInstanceOf(Array);
+    expect(results).toHaveLength(3); // gives all rows with price between [10, 25]
+    results.forEach((doc) => {
+      expect(doc.metadata.category).toBe("books");
+      expect(doc.metadata.price).toBeGreaterThanOrEqual(10);
+      expect(doc.metadata.price).toBeLessThanOrEqual(25);
+    });
+
+    // filter with $exists
+    filter = { price: { $exists: true } };
+    results = await oraclevs.similaritySearch("test", 10, filter);
+    expect(results).toBeInstanceOf(Array);
+    expect(results).toHaveLength(4); // gives all rows with price key
+
+    // filter with $exists to return rows which do not contain price
+    filter = { price: { $exists: false } };
+    await expect(oraclevs.similaritySearch("test", 10, filter)).rejects.toThrow(
+      "No rows found"
+    );
+
+    // filter with $exists for non-existing key
+    filter = { cost: { $exists: true } };
+    await expect(oraclevs.similaritySearch("test", 10, filter)).rejects.toThrow(
+      "No rows found"
+    );
   });
 
   test("should handle a simple _or clause", async () => {
@@ -358,16 +431,15 @@ describe("OracleVectorStore", () => {
     // Complex filter example with _or and nested _and/_or
     const results = await oraclevs.similaritySearch("test", 10, filter);
     const expectedId = (id: string) => {
-      return String(
-        Buffer.from(
-          createHash("sha256")
-            .update(id)
-            .digest("hex")
-            .substring(0, 16)
-            .toUpperCase(),
-          "hex"
-        )
+      const buf = Buffer.from(
+        createHash("sha256")
+          .update(id)
+          .digest("hex")
+          .substring(0, 16)
+          .toUpperCase(),
+        "hex"
       );
+      return buf.toString("hex");
     };
     expect(results).toHaveLength(3);
     expect(results).toEqual(

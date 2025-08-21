@@ -112,10 +112,6 @@ function generateOperatorCondition(
         return `NOT JSON_EXISTS(metadata, '$.${column}')`;
       }
 
-    case "$like":
-      bindValues.push(value);
-      return `JSON_EXISTS(metadata, '$.${column}?(@ like_regex $val)' PASSING :${bindValues.length} AS "val")`;
-
     default:
       throw new Error(`Unsupported operator: ${operator}`);
   }
@@ -638,7 +634,7 @@ export class OracleVS extends VectorStore {
           const document = new Document({
             pageContent: text || "",
             metadata: metadata || {},
-            id: String(row[0]),
+            id: (row[0] as Buffer).toString("hex"),
           });
           docsScoresAndEmbeddings.push([document, distance, embedding]);
         }
